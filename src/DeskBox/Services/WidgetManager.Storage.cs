@@ -17,6 +17,89 @@ namespace DeskBox.Services;
 public sealed partial class WidgetManager
 {
 
+    internal async Task<(string ShortcutPath, string DisplayName, string SystemId, bool DesktopIconHidden)>
+        CreateShellSystemEntryAsync(
+            string widgetId,
+            string systemId,
+            string? displayName,
+            bool hideDesktopIcon)
+    {
+        WidgetConfig? config = FindConfig(widgetId?.Trim() ?? string.Empty);
+        if (config is null ||
+            config.WidgetKind != WidgetKind.File ||
+            config.IsDisabled ||
+            IsDeleted(config.Id) ||
+            string.IsNullOrWhiteSpace(config.MappedFolderPath))
+        {
+            throw new InvalidOperationException(
+                "The widgetId must identify an active File widget with a mapped folder.");
+        }
+
+        if (!DesktopSystemIconService.TryResolve(
+                systemId,
+                out string normalizedSystemId,
+                out string parsingName,
+                out string desktopIconId,
+                out string defaultName))
+        {
+            throw new ArgumentException(
+                $"Unsupported systemId '{systemId}'. Supported values: this_pc, recycle_bin, network, control_panel, user_files.",
+                nameof(systemId));
+        }
+
+        string safeName = FileService.SanitizeFileSystemName(
+            string.IsNullOrWhiteSpace(displayName) ? defaultName : displayName.Trim());
+        if (safeName.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+        {
+            safeName = safeName[..^4].TrimEnd();
+        }
+
+        if (string.IsNullOrWhiteSpace(safeName))
+        {
+            safeName = defaultName;
+        }
+
+        string mappedFolderPath = Path.GetFullPath(config.MappedFolderPath!);
+        Directory.CreateDirectory(mappedFolderPath);
+        string? shortcutPath = Directory.EnumerateFiles(mappedFolderPath, "*.lnk")
+            .FirstOrDefault(path =>
+            {
+                try
+                {
+                    ShortcutInfo? info = ShortcutHelper.ReadStoredMetadata(path);
+                    return info is not null && info.Description.Contains(
+                        $"DeskBox Shell system entry: {normalizedSystemId}",
+                        StringComparison.OrdinalIgnoreCase);
+                }
+                catch { return false; }
+            });
+        shortcutPath ??= Path.Combine(mappedFolderPath, safeName + ".lnk");
+
+        ShortcutHelper.CreateShellNamespaceShortcut(
+            shortcutPath,
+            parsingName,
+            $"DeskBox Shell system entry: {normalizedSystemId}");
+
+        if (hideDesktopIcon)
+        {
+            DesktopSystemIconService.SetDesktopIconHidden(desktopIconId, hidden: true);
+        }
+
+        await RefreshFileWidgetAsync(config.Id);
+        return (shortcutPath, Path.GetFileNameWithoutExtension(shortcutPath), normalizedSystemId, hideDesktopIcon);
+    }
+
+    internal bool SetShellSystemDesktopIconVisibility(string systemId, bool hidden)
+    {
+        if (!DesktopSystemIconService.TryResolve(systemId, out _, out _, out string desktopIconId, out _))
+        {
+            throw new ArgumentException($"Unsupported systemId '{systemId}'.", nameof(systemId));
+        }
+
+        DesktopSystemIconService.SetDesktopIconHidden(desktopIconId, hidden);
+        return hidden;
+    }
+
     public void SyncMappedWidgetShortcut(string widgetId)
     {
         var config = FindConfig(widgetId);

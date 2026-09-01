@@ -372,6 +372,15 @@ public sealed partial class WidgetManager
         _settingsService.SaveDebounced(notifySubscribers: false);
     }
 
+    internal void CancelCapsuleBarDrag(string widgetId)
+    {
+        if (_capsuleBarDragSession is { } session &&
+            string.Equals(session.ActiveWidgetId, widgetId, StringComparison.Ordinal))
+        {
+            _capsuleBarDragSession = null;
+        }
+    }
+
     internal bool MoveCapsuleBarFromExpandedWidget(
         string widgetId,
         int requestedDeltaX,

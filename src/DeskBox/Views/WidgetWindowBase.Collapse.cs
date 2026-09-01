@@ -349,7 +349,12 @@ public abstract partial class WidgetWindowBase
         SetCollapsedState(
             false,
             persistManualState: behavior == WidgetCollapseBehavior.Click,
-            animate: true);
+            animate: true,
+            // An explicit keyboard activation is user intent. Do not make it
+            // wait behind the best-effort background warm-up; the transition
+            // can fall back to live layout while the animation is already
+            // starting.
+            bypassExpansionReadiness: true);
         e.Handled = true;
         return true;
     }
@@ -1904,7 +1909,8 @@ public abstract partial class WidgetWindowBase
         SetCollapsedState(
             false,
             persistManualState: behavior == WidgetCollapseBehavior.Click,
-            animate: true);
+            animate: true,
+            bypassExpansionReadiness: true);
     }
 
     private void WidgetShellControl_CompactBodyExpandRequested(object? sender, RoutedEventArgs e)
@@ -1916,7 +1922,11 @@ public abstract partial class WidgetWindowBase
         SetCollapsedState(
             false,
             persistManualState: EffectiveCollapseBehavior == WidgetCollapseBehavior.Click,
-            animate: true);
+            animate: true,
+            // A click on the capsule is explicit intent. Starting the bounds
+            // transition immediately avoids the readiness deadline becoming
+            // visible as a pause between pointer release and animation.
+            bypassExpansionReadiness: true);
     }
 
     private void WidgetShellControl_CompactPointerEntered(object? sender, EventArgs e)
@@ -2839,6 +2849,17 @@ public abstract partial class WidgetWindowBase
             animate ? ResolveCompactTransitionDuration(durationMs) : 0,
             transitionAnchor,
             transitionPivot);
+    }
+
+    internal void ApplyAgentCollapsedState(bool collapsed)
+    {
+        SetCollapsedState(
+            collapsed,
+            persistManualState: true,
+            animate: false,
+            allowDuringInteraction: true,
+            bypassExpansionReadiness: true,
+            transitionReason: WidgetCompactTransitionReason.Interaction);
     }
 
     private RectInt32 ResolvePersistedExpandedHostBounds()

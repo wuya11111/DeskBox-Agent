@@ -298,7 +298,9 @@ public sealed class DesktopOrganizationTransaction
                      .SelectMany(target => target.Items.Select(item => new
                      {
                          Target = target.TargetDirectoryPath,
-                         item.Size
+                         item.Size,
+                         item.SourcePath,
+                         item.IsDirectory
                      }))
                      .GroupBy(item => Path.GetPathRoot(Path.GetFullPath(item.Target)),
                          StringComparer.OrdinalIgnoreCase))
@@ -310,12 +312,46 @@ public sealed class DesktopOrganizationTransaction
             }
 
             var drive = new DriveInfo(driveGroup.Key);
-            long required = driveGroup.Sum(item => item.Size);
+            long required = driveGroup.Sum(item => GetTransferSize(item.Size, item.SourcePath, item.IsDirectory));
             const long safetyMargin = 16L * 1024 * 1024;
             if (drive.AvailableFreeSpace < required + safetyMargin)
             {
                 throw new IOException($"There is not enough free space on {drive.Name}.");
             }
+        }
+    }
+
+    private static long GetTransferSize(long snapshotSize, string sourcePath, bool isDirectory)
+    {
+        // Directory snapshots intentionally have Size=0. Calculate their
+        // current content size for the preflight check without changing the
+        // public scan contract.
+        if (!isDirectory || !Directory.Exists(sourcePath))
+        {
+            return snapshotSize;
+        }
+
+        try
+        {
+            long total = 0;
+            var options = new EnumerationOptions
+            {
+                RecurseSubdirectories = true,
+                IgnoreInaccessible = true,
+                AttributesToSkip = FileAttributes.ReparsePoint
+            };
+            foreach (string filePath in Directory.EnumerateFiles(sourcePath, "*", options))
+            {
+                total = checked(total + new FileInfo(filePath).Length);
+            }
+
+            return total;
+        }
+        catch
+        {
+            // The move itself remains authoritative; a transient enumeration
+            // failure must not make an otherwise valid folder unmovable.
+            return snapshotSize;
         }
     }
 

@@ -33,6 +33,7 @@ public sealed class DeskBoxDataPathService
     public string InstanceScope { get; }
     public string ActivationEventName => $"DeskBox_Activate_Event_{InstanceScope}";
     public string SingleInstanceMutexName => $"DeskBox_SingleInstance_Mutex_{InstanceScope}";
+    public string AgentPipeName => $"DeskBox_Agent_{InstanceScope}";
     public string DataDirectory => Path.Combine(RootPath, "data");
     public string UpdatesDirectory => Path.Combine(RootPath, "updates");
     // Recovery snapshots intentionally live beside, rather than inside, the

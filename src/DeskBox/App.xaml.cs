@@ -90,6 +90,7 @@ public partial class App : Application
     internal event Action<bool>? OnboardingWidgetsVisibilityChanged;
     private NativeAppNotificationService? _nativeNotificationService;
     private TodoReminderService? _todoReminderService;
+    private AgentPipeServer? _agentPipeServer;
     private DisplayAreaWatcherService? _displayAreaWatcher;
     private DisplayTopologyTransitionCoordinator? _displayTopologyTransitionCoordinator;
     private AppLifecycleRecoveryWatcher? _lifecycleRecoveryWatcher;
@@ -160,6 +161,7 @@ public partial class App : Application
     public NativeAppNotificationService? NativeNotificationService => _nativeNotificationService;
     public DisplayAreaWatcherService? DisplayAreaWatcher => _displayAreaWatcher;
     public TodoReminderService? TodoReminderService => _todoReminderService;
+    public AgentCommandService? AgentCommandService { get; private set; }
     public DesktopAutoOrganizationWatcher? DesktopAutoOrganizationWatcher { get; private set; }
     public SettingsWindow? SettingsWindowInstance => _settingsWindow;
 
@@ -1037,6 +1039,18 @@ public partial class App : Application
             DesktopAutoOrganizationWatcher.Start();
 
             await EnsureOnboardingAsync(isInteractiveLaunch: !IsStartupMode);
+
+            AgentCommandService = new AgentCommandService(
+                SettingsService,
+                FileService,
+                OrganizerService,
+                WidgetManager,
+                LocalizationService);
+            _agentPipeServer = new AgentPipeServer(
+                DeskBoxDataPathService.Current.AgentPipeName,
+                AgentCommandService);
+            _agentPipeServer.Start();
+            Log($"[Agent] Local command pipe started name={DeskBoxDataPathService.Current.AgentPipeName}");
 
             ScheduleBackgroundUpdateCheck();
             _diagnosticsService = new AppDiagnosticsService(UiDispatcherQueue);
@@ -3623,6 +3637,15 @@ public partial class App : Application
     private async Task ShutdownApplicationAsync()
     {
         StopVisibleIdleMemoryMaintenance();
+
+        if (_agentPipeServer is not null)
+        {
+            await _agentPipeServer.DisposeAsync();
+            _agentPipeServer = null;
+        }
+
+        AgentCommandService?.Dispose();
+        AgentCommandService = null;
 
         // Stop the display area watcher FIRST, before closing any widgets,
         // so that no DisplaysChanged callback can fire during teardown

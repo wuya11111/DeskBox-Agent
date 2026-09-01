@@ -134,6 +134,7 @@ public sealed partial class WidgetManager
     private EffectivePerformanceSettings _lastPerformanceSettings;
 
     internal IReadOnlyDictionary<string, ContentWidgetWindow> ContentWidgets => _contentWidgets;
+    internal int VisibleWidgetCountForAgent => GetLoadedDesktopWindows().Count(window => window.Visible);
 
     public bool WidgetsRaisedFromTray => _widgetsRaisedFromTray;
     public WidgetSessionState SessionState => _sessionManager.State;
@@ -1987,6 +1988,23 @@ public sealed partial class WidgetManager
         {
             await fileSurface.ViewModel.RefreshFromConfigAsync();
         }
+    }
+
+    public async Task<bool> RefreshTodoWidgetAsync(string widgetId)
+    {
+        if (!HasUiThreadAccess())
+        {
+            return await RunOnUiThreadAsync(() => RefreshTodoWidgetAsync(widgetId));
+        }
+
+        if (!_contentWidgets.TryGetValue(widgetId, out ContentWidgetWindow? contentWindow) ||
+            contentWindow.CurrentContent is not TodoWidgetContentAdapter todoContent)
+        {
+            return false;
+        }
+
+        await todoContent.RefreshAsync();
+        return true;
     }
 
     public void SetDesktopOrganizationBusy(

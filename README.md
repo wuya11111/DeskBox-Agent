@@ -1,5 +1,8 @@
 # DeskBox
 
+> [!IMPORTANT]
+> This repository is an unofficial DeskBox Agent/MCP fork. It is not an official release by the upstream DeskBox author. See [Agent control](docs/agent-control.md) for the added AI integration.
+
 **A free, open-source Windows desktop organizer with native-feeling WinUI 3 widgets.**
 
 English | [简体中文](README.zh-CN.md)

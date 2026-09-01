@@ -159,6 +159,29 @@ public sealed class DesktopOrganizationTests : IDisposable
     }
 
     [Fact]
+    public async Task Scanner_PublicDesktopUsesPublicRootAndReturnsSelectableFiles()
+    {
+        string userDesktop = Directory.CreateDirectory(
+            Path.Combine(_root, "user-desktop")).FullName;
+        string publicDesktop = Directory.CreateDirectory(
+            Path.Combine(_root, "public-desktop")).FullName;
+        File.WriteAllText(Path.Combine(userDesktop, "private.txt"), "private");
+        File.WriteAllText(Path.Combine(publicDesktop, "shared.lnk"), "shared");
+        var scanner = new DesktopOrganizationScanner(
+            new DesktopOrganizationClassifier(),
+            () => userDesktop,
+            () => publicDesktop);
+
+        DesktopOrganizationScanResult result = await scanner.ScanPublicAsync();
+
+        Assert.Equal(publicDesktop, result.DesktopPath);
+        DesktopOrganizationFileSnapshot item = Assert.Single(result.Items);
+        Assert.Equal("shared.lnk", item.Name);
+        Assert.True(item.IsEligible);
+        Assert.Equal(DesktopOrganizationExclusionReason.None, item.ExclusionReason);
+    }
+
+    [Fact]
     public async Task Scanner_LimitsQuickBatchItemCount()
     {
         Directory.CreateDirectory(_root);

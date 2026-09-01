@@ -1,5 +1,8 @@
 # DeskBox
 
+> [!IMPORTANT]
+> 这是 DeskBox 的非官方 Agent/MCP 修改版，不是上游作者发布的官方版本。新增的 AI 控制能力请参阅 [Agent 控制说明](docs/agent-control.md)。
+
 **本地优先的 Windows 10/11 桌面整理工具：用格子管理文件、文件夹、时光、待办、随记、搜索、天气和音乐。**
 
 简体中文 | [English](README.md)

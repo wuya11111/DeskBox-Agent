@@ -515,6 +515,66 @@ public static class ShortcutHelper
         InvalidateStoredMetadataCache(normalizedShortcutPath);
     }
 
+    /// <summary>
+    /// Creates a .lnk that targets an arbitrary Windows Shell namespace
+    /// parsing name (for example a known folder GUID).
+    /// </summary>
+    public static void CreateShellNamespaceShortcut(
+        string shortcutPath,
+        string parsingName,
+        string description)
+    {
+        string normalizedShortcutPath = Path.GetFullPath(shortcutPath);
+        string normalizedParsingName = parsingName?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedParsingName) ||
+            normalizedParsingName.Length > 2048 ||
+            normalizedParsingName.Contains('\0'))
+        {
+            throw new ArgumentException("A valid Shell parsing name is required.", nameof(parsingName));
+        }
+
+        string? shortcutDirectory = Path.GetDirectoryName(normalizedShortcutPath);
+        if (string.IsNullOrWhiteSpace(shortcutDirectory))
+        {
+            throw new ArgumentException("Shortcut path must include a directory.", nameof(shortcutPath));
+        }
+
+        Directory.CreateDirectory(shortcutDirectory);
+#if DESKBOX_NATIVE_AOT
+        ShortcutNativeWriteCallResult native = ShortcutNativeBackend.WriteShellNamespaceShortcut(
+            normalizedShortcutPath,
+            normalizedParsingName,
+            description ?? string.Empty);
+        if (!native.Success)
+        {
+            LogNativeWriteFailure("Shell namespace write", normalizedShortcutPath, native);
+            throw new InvalidOperationException($"Rust Shell namespace shortcut write failed: {native.Failure}; {native.Detail}");
+        }
+#else
+        if (ShortcutBackendPolicy.Current == ShortcutBackendMode.Rust)
+        {
+            ShortcutNativeWriteCallResult native = ShortcutNativeBackend.WriteShellNamespaceShortcut(
+                normalizedShortcutPath,
+                normalizedParsingName,
+                description ?? string.Empty);
+            if (!native.Success)
+            {
+                LogNativeWriteFailure("Shell namespace write", normalizedShortcutPath, native);
+                throw new InvalidOperationException($"Rust Shell namespace shortcut write failed: {native.Failure}; {native.Detail}");
+            }
+        }
+        else
+        {
+            CreateShellNamespaceShortcutWithCSharp(
+                normalizedShortcutPath,
+                normalizedParsingName,
+                description ?? string.Empty);
+        }
+#endif
+
+        InvalidateStoredMetadataCache(normalizedShortcutPath);
+    }
+
 #if !DESKBOX_NATIVE_AOT
     internal static void CreateOrUpdateFolderShortcutWithCSharp(
         string normalizedShortcutPath,

@@ -50,6 +50,324 @@ public sealed class DesktopOrganizationCoordinator
         return plan;
     }
 
+    public Task<DesktopOrganizationScanResult> ScanDesktopAsync(
+        bool includeSlowItems = false,
+        CancellationToken cancellationToken = default) =>
+        _scanner.ScanAsync(includeSlowItems, cancellationToken);
+
+    public Task<DesktopOrganizationScanResult> ScanPublicDesktopAsync(
+        bool includeSlowItems = false,
+        CancellationToken cancellationToken = default) =>
+        _scanner.ScanPublicAsync(includeSlowItems, cancellationToken);
+
+    public async Task<DesktopOrganizationPlan> BuildPlanForExistingWidgetAsync(
+        string widgetId,
+        IReadOnlyCollection<string> sourcePaths,
+        bool includeSlowItems = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(widgetId))
+        {
+            throw new ArgumentException("A widgetId is required.", nameof(widgetId));
+        }
+
+        WidgetConfig? widget = _settingsService.Settings.Widgets.FirstOrDefault(candidate =>
+            string.Equals(candidate.Id, widgetId.Trim(), StringComparison.Ordinal) &&
+            candidate.WidgetKind == WidgetKind.File &&
+            !candidate.IsDisabled &&
+            !_settingsService.Settings.DeletedWidgetIds.Contains(candidate.Id) &&
+            !string.IsNullOrWhiteSpace(candidate.MappedFolderPath));
+        if (widget is null)
+        {
+            throw new InvalidOperationException(
+                "The widgetId must identify an active File widget with a mapped folder.");
+        }
+
+        DesktopOrganizationScanResult userScan = await _scanner.ScanAsync(
+            includeSlowItems,
+            cancellationToken);
+        DesktopOrganizationScanResult publicScan = await _scanner.ScanPublicAsync(
+            includeSlowItems,
+            cancellationToken);
+        DesktopOrganizationFileSnapshot[] scannedItems = userScan.Items
+            .Concat(publicScan.Items)
+            .GroupBy(item => item.SourcePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToArray();
+        var itemsByPath = scannedItems.ToDictionary(
+            item => item.SourcePath,
+            StringComparer.OrdinalIgnoreCase);
+        var selectedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var selectedItems = new List<DesktopOrganizationFileSnapshot>();
+        foreach (string sourcePath in sourcePaths)
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath))
+            {
+                throw new ArgumentException(
+                    "sourcePaths entries must be non-empty.",
+                    nameof(sourcePaths));
+            }
+
+            string normalizedPath = Path.GetFullPath(sourcePath.Trim());
+            if (!itemsByPath.TryGetValue(normalizedPath, out DesktopOrganizationFileSnapshot? item))
+            {
+                throw new InvalidOperationException(
+                    $"The path is not a current top-level desktop item: '{sourcePath}'.");
+            }
+
+            bool selectableFolder = item.IsDirectory &&
+                item.ExclusionReason == DesktopOrganizationExclusionReason.Folder;
+            if ((!item.IsEligible && !selectableFolder) ||
+                item.ExclusionReason is DesktopOrganizationExclusionReason.HiddenOrSystem or
+                    DesktopOrganizationExclusionReason.ReparsePoint or
+                    DesktopOrganizationExclusionReason.OfflinePlaceholder or
+                    DesktopOrganizationExclusionReason.TemporaryOrDownloading or
+                    DesktopOrganizationExclusionReason.Unavailable)
+            {
+                throw new InvalidOperationException(
+                    $"The desktop item cannot be organized: '{item.Name}'.");
+            }
+
+            if (selectedPaths.Add(normalizedPath))
+            {
+                selectedItems.Add(selectableFolder
+                    ? item with { ExclusionReason = DesktopOrganizationExclusionReason.None }
+                    : item);
+            }
+        }
+
+        if (selectedItems.Count == 0)
+        {
+            throw new ArgumentException(
+                "At least one sourcePaths entry is required.",
+                nameof(sourcePaths));
+        }
+
+        var targets = new List<DesktopOrganizationTargetPlan>
+        {
+            new()
+            {
+                SourceBucketId = $"widget:{widget.Id}",
+                CategoryId = DesktopOrganizationCategoryIds.Other,
+                TargetWidgetId = widget.Id,
+                SuggestedDisplayName = widget.Name,
+                TargetDirectoryPath = Path.GetFullPath(widget.MappedFolderPath!),
+                CreatesWidget = false,
+                Items = selectedItems
+            }
+        };
+
+        return new DesktopOrganizationPlan
+        {
+            DesktopPath = userScan.DesktopPath,
+            StorageRootPath = SettingsService.NormalizeManagedStorageRootPath(
+                _settingsService.Settings.DefaultManagedStorageRootPath),
+            Targets = targets,
+            ExcludedItems = scannedItems
+                .Where(item => !selectedPaths.Contains(item.SourcePath))
+                .Select(item => item.IsEligible
+                    ? item with { ExclusionReason = DesktopOrganizationExclusionReason.UserChoice }
+                    : item)
+                .ToList()
+        };
+    }
+
+    public async Task<DesktopOrganizationPlan> BuildCustomPlanAsync(
+        IReadOnlyCollection<DesktopOrganizationCustomGroup> groups,
+        bool includeSlowItems = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (groups.Count == 0 || groups.Count > DesktopOrganizationPlanner.MaxNewWidgetCount)
+        {
+            throw new ArgumentException(
+                $"Custom organization must contain between 1 and {DesktopOrganizationPlanner.MaxNewWidgetCount} groups.",
+                nameof(groups));
+        }
+
+        var normalizedNames = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
+        foreach (DesktopOrganizationCustomGroup group in groups)
+        {
+            if (string.IsNullOrWhiteSpace(group.Name) || !normalizedNames.Add(group.Name.Trim()))
+            {
+                throw new ArgumentException("Custom group names must be non-empty and unique.", nameof(groups));
+            }
+        }
+
+        DesktopOrganizationScanResult scan = await _scanner.ScanAsync(includeSlowItems, cancellationToken);
+        var itemsByPath = scan.Items.ToDictionary(item => item.SourcePath, StringComparer.OrdinalIgnoreCase);
+        var selectedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var reservedDirectories = _settingsService.Settings.Widgets
+            .Where(widget => !string.IsNullOrWhiteSpace(widget.MappedFolderPath))
+            .Select(widget => Path.GetFullPath(widget.MappedFolderPath!))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        string storageRoot = SettingsService.NormalizeManagedStorageRootPath(
+            _settingsService.Settings.DefaultManagedStorageRootPath);
+        var targets = new List<DesktopOrganizationTargetPlan>();
+
+        foreach (DesktopOrganizationCustomGroup group in groups)
+        {
+            var selectedItems = new List<DesktopOrganizationFileSnapshot>();
+            foreach (string sourcePath in group.SourcePaths)
+            {
+                if (string.IsNullOrWhiteSpace(sourcePath))
+                {
+                    throw new ArgumentException("Custom group paths must be non-empty.", nameof(groups));
+                }
+
+                string normalizedPath = Path.GetFullPath(sourcePath.Trim());
+                if (!itemsByPath.TryGetValue(normalizedPath, out DesktopOrganizationFileSnapshot? item))
+                {
+                    throw new InvalidOperationException(
+                        $"The path is not a current top-level desktop item: '{sourcePath}'.");
+                }
+
+                if (!item.IsEligible || item.IsDirectory)
+                {
+                    throw new InvalidOperationException(
+                        $"The desktop item cannot be organized: '{item.Name}'.");
+                }
+
+                if (!selectedPaths.Add(normalizedPath))
+                {
+                    throw new InvalidOperationException(
+                        $"The desktop item was assigned to more than one group: '{item.Name}'.");
+                }
+
+                selectedItems.Add(item);
+            }
+
+            if (selectedItems.Count == 0)
+            {
+                throw new ArgumentException(
+                    $"Custom group '{group.Name.Trim()}' must contain at least one desktop file.",
+                    nameof(groups));
+            }
+
+            string directory = FileService.GetAvailablePath(
+                Path.Combine(storageRoot, SanitizeCustomFolderName(group.Name)),
+                reservedDirectories);
+            targets.Add(new DesktopOrganizationTargetPlan
+            {
+                SourceBucketId = $"custom:{targets.Count}",
+                CategoryId = "Custom",
+                TargetWidgetId = Guid.NewGuid().ToString("N"),
+                SuggestedDisplayName = group.Name.Trim(),
+                TargetDirectoryPath = directory,
+                CreatesWidget = true,
+                Items = selectedItems
+            });
+        }
+
+        var excluded = scan.Items
+            .Where(item => !selectedPaths.Contains(item.SourcePath))
+            .Select(item => selectedPaths.Contains(item.SourcePath)
+                ? item
+                : item with
+                {
+                    ExclusionReason = item.IsEligible
+                        ? DesktopOrganizationExclusionReason.UserChoice
+                        : item.ExclusionReason
+                })
+            .ToList();
+        var plan = new DesktopOrganizationPlan
+        {
+            DesktopPath = scan.DesktopPath,
+            StorageRootPath = storageRoot,
+            Targets = targets,
+            ExcludedItems = excluded
+        };
+        AssignNonOverlappingBounds(plan);
+        return plan;
+    }
+
+    public async Task<DesktopOrganizationPlan> BuildPlanForExistingWidgetsAsync(
+        IReadOnlyCollection<DesktopOrganizationWidgetSelection> selections,
+        bool includeSlowItems = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (selections.Count == 0)
+        {
+            throw new ArgumentException("At least one widget selection is required.", nameof(selections));
+        }
+
+        DesktopOrganizationScanResult userScan = await _scanner.ScanAsync(includeSlowItems, cancellationToken);
+        DesktopOrganizationScanResult publicScan = await _scanner.ScanPublicAsync(includeSlowItems, cancellationToken);
+        DesktopOrganizationFileSnapshot[] scannedItems = userScan.Items
+            .Concat(publicScan.Items)
+            .GroupBy(item => item.SourcePath, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToArray();
+        var itemsByPath = scannedItems.ToDictionary(item => item.SourcePath, StringComparer.OrdinalIgnoreCase);
+        var selectedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var targets = new List<DesktopOrganizationTargetPlan>();
+
+        foreach (DesktopOrganizationWidgetSelection selection in selections)
+        {
+            if (string.IsNullOrWhiteSpace(selection.WidgetId) || selection.SourcePaths.Count == 0)
+            {
+                throw new ArgumentException("Each selection requires a widgetId and at least one source path.", nameof(selections));
+            }
+
+            WidgetConfig? widget = _settingsService.Settings.Widgets.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, selection.WidgetId.Trim(), StringComparison.Ordinal) &&
+                candidate.WidgetKind == WidgetKind.File && !candidate.IsDisabled &&
+                !_settingsService.Settings.DeletedWidgetIds.Contains(candidate.Id) &&
+                !string.IsNullOrWhiteSpace(candidate.MappedFolderPath));
+            if (widget is null)
+            {
+                throw new InvalidOperationException($"The widgetId must identify an active File widget with a mapped folder: '{selection.WidgetId}'.");
+            }
+
+            var selectedItems = new List<DesktopOrganizationFileSnapshot>();
+            foreach (string sourcePath in selection.SourcePaths)
+            {
+                string normalizedPath = Path.GetFullPath(sourcePath.Trim());
+                if (!itemsByPath.TryGetValue(normalizedPath, out DesktopOrganizationFileSnapshot? item))
+                {
+                    throw new InvalidOperationException($"The path is not a current top-level desktop item: '{sourcePath}'.");
+                }
+
+                bool selectableFolder = item.IsDirectory && item.ExclusionReason == DesktopOrganizationExclusionReason.Folder;
+                if ((!item.IsEligible && !selectableFolder) || item.ExclusionReason is
+                    DesktopOrganizationExclusionReason.HiddenOrSystem or DesktopOrganizationExclusionReason.ReparsePoint or
+                    DesktopOrganizationExclusionReason.OfflinePlaceholder or DesktopOrganizationExclusionReason.TemporaryOrDownloading or
+                    DesktopOrganizationExclusionReason.Unavailable)
+                {
+                    throw new InvalidOperationException($"The desktop item cannot be organized: '{item.Name}'.");
+                }
+
+                if (!selectedPaths.Add(normalizedPath))
+                {
+                    throw new InvalidOperationException($"The desktop item was assigned to more than one widget: '{item.Name}'.");
+                }
+
+                selectedItems.Add(selectableFolder ? item with { ExclusionReason = DesktopOrganizationExclusionReason.None } : item);
+            }
+
+            targets.Add(new DesktopOrganizationTargetPlan
+            {
+                SourceBucketId = $"widget:{widget.Id}",
+                CategoryId = DesktopOrganizationCategoryIds.Other,
+                TargetWidgetId = widget.Id,
+                SuggestedDisplayName = widget.Name,
+                TargetDirectoryPath = Path.GetFullPath(widget.MappedFolderPath!),
+                CreatesWidget = false,
+                Items = selectedItems
+            });
+        }
+
+        var plan = new DesktopOrganizationPlan
+        {
+            DesktopPath = userScan.DesktopPath,
+            StorageRootPath = SettingsService.NormalizeManagedStorageRootPath(_settingsService.Settings.DefaultManagedStorageRootPath),
+            Targets = targets,
+            ExcludedItems = scannedItems.Where(item => !selectedPaths.Contains(item.SourcePath)).Select(item =>
+                item.IsEligible ? item with { ExclusionReason = DesktopOrganizationExclusionReason.UserChoice } : item).ToList()
+        };
+        AssignNonOverlappingBounds(plan);
+        return plan;
+    }
+
     /// <summary>
     /// Compiles the user's preview selections into an immutable execution
     /// plan. The scan plan is never mutated, so changing a combo box cannot
@@ -293,6 +611,13 @@ public sealed class DesktopOrganizationCoordinator
         return string.Equals(localized, key, StringComparison.Ordinal)
             ? categoryId
             : localized;
+    }
+
+    private static string SanitizeCustomFolderName(string name)
+    {
+        string sanitized = string.Concat(name.Trim().Select(character =>
+            Path.GetInvalidFileNameChars().Contains(character) ? '_' : character));
+        return string.IsNullOrWhiteSpace(sanitized) ? "分类" : sanitized;
     }
 
     private void AssignNonOverlappingBounds(DesktopOrganizationPlan plan)

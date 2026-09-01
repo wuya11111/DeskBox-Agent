@@ -45,18 +45,41 @@ public sealed class DesktopOrganizationScanner
         bool includeSlowItems = false,
         CancellationToken cancellationToken = default)
     {
-        return Task.Run(() => Scan(includeSlowItems, cancellationToken), cancellationToken);
+        return Task.Run(
+            () => Scan(includeSlowItems, cancellationToken, publicDesktop: false),
+            cancellationToken);
+    }
+
+    public Task<DesktopOrganizationScanResult> ScanPublicAsync(
+        bool includeSlowItems = false,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.Run(
+            () => Scan(includeSlowItems, cancellationToken, publicDesktop: true),
+            cancellationToken);
     }
 
     internal DesktopOrganizationFileSnapshot CreateAutoOrganizationSnapshot(string path) =>
         CreateSnapshot(
             path,
             NormalizeOptionalPath(_publicDesktopPathProvider()),
-            includeSlowItems: false);
+            includeSlowItems: false,
+            excludePublicDesktopItems: true);
 
-    private DesktopOrganizationScanResult Scan(bool includeSlowItems, CancellationToken cancellationToken)
+    private DesktopOrganizationScanResult Scan(
+        bool includeSlowItems,
+        CancellationToken cancellationToken,
+        bool publicDesktop)
     {
-        string desktopPath = Path.GetFullPath(_desktopPathProvider());
+        string configuredDesktopPath = publicDesktop
+            ? _publicDesktopPathProvider()
+            : _desktopPathProvider();
+        if (string.IsNullOrWhiteSpace(configuredDesktopPath))
+        {
+            return new DesktopOrganizationScanResult();
+        }
+
+        string desktopPath = Path.GetFullPath(configuredDesktopPath);
         string publicDesktopPath = NormalizeOptionalPath(_publicDesktopPathProvider());
         var items = new List<DesktopOrganizationFileSnapshot>();
 
@@ -72,7 +95,11 @@ public sealed class DesktopOrganizationScanner
         foreach (string path in Directory.EnumerateFileSystemEntries(desktopPath, "*", SearchOption.TopDirectoryOnly))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            items.Add(CreateSnapshot(path, publicDesktopPath, includeSlowItems));
+            items.Add(CreateSnapshot(
+                path,
+                publicDesktopPath,
+                includeSlowItems,
+                excludePublicDesktopItems: !publicDesktop));
         }
 
         if (!includeSlowItems)
@@ -118,7 +145,8 @@ public sealed class DesktopOrganizationScanner
     private DesktopOrganizationFileSnapshot CreateSnapshot(
         string path,
         string publicDesktopPath,
-        bool includeSlowItems)
+        bool includeSlowItems,
+        bool excludePublicDesktopItems)
     {
         string fullPath = Path.GetFullPath(path);
         string name = Path.GetFileName(fullPath);
@@ -149,7 +177,7 @@ public sealed class DesktopOrganizationScanner
                         ? DesktopOrganizationExclusionReason.OfflinePlaceholder
                         : isTemporary
                             ? DesktopOrganizationExclusionReason.TemporaryOrDownloading
-                            : IsUnderPath(fullPath, publicDesktopPath)
+                            : excludePublicDesktopItems && IsUnderPath(fullPath, publicDesktopPath)
                                 ? DesktopOrganizationExclusionReason.PublicDesktopItem
                                 : isDirectory
                                     ? DesktopOrganizationExclusionReason.Folder

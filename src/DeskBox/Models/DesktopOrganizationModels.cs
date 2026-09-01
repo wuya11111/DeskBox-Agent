@@ -188,6 +188,14 @@ public sealed class DesktopOrganizationPlan
     public long TotalTransferSize => Targets.Sum(target => target.Items.Sum(item => item.Size));
 }
 
+public sealed record DesktopOrganizationCustomGroup(
+    string Name,
+    IReadOnlyCollection<string> SourcePaths);
+
+public sealed record DesktopOrganizationWidgetSelection(
+    string WidgetId,
+    IReadOnlyCollection<string> SourcePaths);
+
 public readonly record struct DesktopOrganizationRect(
     double X,
     double Y,

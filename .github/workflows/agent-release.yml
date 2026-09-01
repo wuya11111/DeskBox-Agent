@@ -1,0 +1,68 @@
+name: Agent release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 1.4.8-agent.1
+        required: true
+        default: 1.4.8-agent.1
+  push:
+    tags:
+      - "v*-agent.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-x64:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Select release version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          } else {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build DeskBox Agent package
+        shell: pwsh
+        run: |
+          .\scripts\publish-agent-release.ps1 `
+            -Platform x64 `
+            -Version "${{ steps.version.outputs.version }}"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeskBox-Agent-${{ steps.version.outputs.version }}-win-x64
+          path: |
+            .artifacts/agent-release/win-x64/*.zip
+            .artifacts/agent-release/win-x64/*.sha256
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          $root = ".artifacts\agent-release\win-x64"
+          gh release create "${{ github.ref_name }}" `
+            "$root\DeskBox-Agent-$version-win-x64.zip" `
+            "$root\DeskBox-Agent-$version-win-x64.zip.sha256" `
+            --title "DeskBox Agent $version" `
+            --generate-notes

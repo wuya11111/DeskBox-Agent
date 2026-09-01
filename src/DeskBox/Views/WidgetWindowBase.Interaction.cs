@@ -399,7 +399,34 @@ public abstract partial class WidgetWindowBase
 
         _isCoordinatedMoveDrag = false;
 
+        // A pointer press on the capsule is routed through the window-drag
+        // path so the same surface can still be dragged. When the pointer did
+        // not move, none of the expensive drag finalization work is useful:
+        // there is no new position to persist, no group drag to complete, and
+        // no expanded bounds to recalculate. Keep the interaction/layer
+        // cleanup, but leave the click handler free to start the expand
+        // transition immediately after this method returns.
+        if (!hasMoved)
+        {
+            if (IsCompactArrangementDragActive)
+            {
+                App.Current?.WidgetManager?.CancelCapsuleBarDrag(Config.Id);
+                IsCompactArrangementDragActive = false;
+            }
+            EndWidgetBoundsInteraction();
+            OnDragEnd(hasMoved: false);
+            DisplayChangeWatcher?.ResumeRestore();
+            HasMovedTitleBarDrag = false;
+            RestoreBackdropAfterInteraction();
+            QueueBackdropRefresh();
+            App.Current?.WidgetManager?.RestoreTemporarilyRaisedWidgetsToDesktopLayer(
+                "click-ended");
+            e.Handled = true;
+            return;
+        }
+
         CompleteCompactArrangementDrag();
+
         RectInt32 finalBounds = GetActualWindowBounds();
         finalBounds = CompleteExpandedWidgetDrag(finalBounds);
         CapturePositionAnchor(finalBounds.X, finalBounds.Y, finalBounds.Width, finalBounds.Height);

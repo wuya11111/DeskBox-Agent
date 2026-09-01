@@ -55,6 +55,29 @@ public sealed class OrganizerService
             .FirstOrDefault();
     }
 
+    public async Task<OrganizationHistoryEntry> RecordAgentHistoryAsync(
+        string widgetId,
+        string widgetName,
+        string actionType,
+        bool move,
+        IEnumerable<OrganizationHistoryItem> items,
+        IEnumerable<OrganizationHistoryTarget>? targets = null,
+        bool canUndo = true)
+    {
+        var entry = new OrganizationHistoryEntry
+        {
+            WidgetId = widgetId,
+            WidgetName = widgetName,
+            ActionType = actionType,
+            TransferMode = move ? "Move" : "Copy",
+            CanUndo = canUndo,
+            Items = items.ToList(),
+            Targets = targets?.ToList() ?? []
+        };
+        await AddHistoryEntryAsync(entry);
+        return entry;
+    }
+
     public async Task<OrganizationHistoryEntry> OrganizeDropAsync(
         WidgetConfig widget,
         string widgetName,
