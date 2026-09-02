@@ -1,12 +1,12 @@
-name: Agent release
+name: 发布 Agent/MCP 中文安装包
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version, for example 1.4.8-agent.1
+        description: 发布版本，例如 1.4.8-agent.2
         required: true
-        default: 1.4.8-agent.1
+        default: 1.4.8-agent.2
   push:
     tags:
       - "v*-agent.*"
@@ -18,15 +18,19 @@ jobs:
   build-x64:
     runs-on: windows-latest
     steps:
-      - name: Check out source
+      - name: 检出源码
         uses: actions/checkout@v4
 
-      - name: Install .NET 10 SDK
+      - name: 安装 .NET 10 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
-      - name: Select release version
+      - name: 安装 Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: 读取发布版本
         id: version
         shell: pwsh
         run: |
@@ -37,23 +41,24 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
 
-      - name: Build DeskBox Agent package
+      - name: 构建本体和 MCP 独立安装包
         shell: pwsh
         run: |
           .\scripts\publish-agent-release.ps1 `
             -Platform x64 `
             -Version "${{ steps.version.outputs.version }}"
 
-      - name: Upload workflow artifact
+      - name: 上传工作流产物
         uses: actions/upload-artifact@v4
         with:
-          name: DeskBox-Agent-${{ steps.version.outputs.version }}-win-x64
+          name: DeskBox-Agent-${{ steps.version.outputs.version }}-中文安装包-win-x64
           path: |
+            .artifacts/agent-release/win-x64/*.exe
             .artifacts/agent-release/win-x64/*.zip
             .artifacts/agent-release/win-x64/*.sha256
           if-no-files-found: error
 
-      - name: Create GitHub Release
+      - name: 创建中文 GitHub Release
         if: github.event_name == 'push'
         shell: pwsh
         env:
@@ -62,7 +67,13 @@ jobs:
           $version = "${{ steps.version.outputs.version }}"
           $root = ".artifacts\agent-release\win-x64"
           gh release create "${{ github.ref_name }}" `
-            "$root\DeskBox-Agent-$version-win-x64.zip" `
-            "$root\DeskBox-Agent-$version-win-x64.zip.sha256" `
-            --title "DeskBox Agent $version" `
-            --generate-notes
+            "$root\DeskBox-Agent-$version-App-win-x64.exe" `
+            "$root\DeskBox-Agent-$version-App-win-x64.exe.sha256" `
+            "$root\DeskBox-Agent-$version-App-win-x64.zip" `
+            "$root\DeskBox-Agent-$version-App-win-x64.zip.sha256" `
+            "$root\DeskBox-Agent-$version-MCP-win-x64.exe" `
+            "$root\DeskBox-Agent-$version-MCP-win-x64.exe.sha256" `
+            "$root\DeskBox-Agent-$version-MCP-win-x64.zip" `
+            "$root\DeskBox-Agent-$version-MCP-win-x64.zip.sha256" `
+            --title "DeskBox Agent $version 中文安装版" `
+            --notes "这是基于 DeskBox 的非官方 Agent/MCP 修改版，不是上游作者发布的官方版本。`n`n只使用桌面整理功能请安装 App 本体；需要 AI 控制时，再安装 MCP 扩展。两个安装包可以分别升级和卸载。`n`n安装和配置说明见压缩包内的 README.md 以及仓库 docs/agent-control.md。"

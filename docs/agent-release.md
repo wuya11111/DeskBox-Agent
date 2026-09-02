@@ -3,19 +3,27 @@
 这是基于 DeskBox 的非官方 Agent/MCP 修改版，不是原作者发布的官方版本。
 上游项目：<https://github.com/Tianyu199509/DeskBox>
 
-## 使用方法
+## 安装方法
 
-1. 将整个压缩包解压到一个固定目录，例如 `D:\Apps\DeskBox-Agent`。
-2. 运行根目录中的 `DeskBox.exe`。
+MCP 已与 DeskBox 本体拆分。请先安装 DeskBox 本体，再安装 MCP 扩展：
+
+1. 双击 `DeskBox-Agent-*-App-win-x64.exe` 安装本体。
+2. 需要 AI 控制时，再双击 `DeskBox-Agent-*-MCP-win-x64.exe`。安装程序会自动寻找本体目录。
 3. 在 ChatGPT 的 MCP 设置中添加一个 stdio 服务器：
    - 名称：`deskbox`
-   - 命令：`D:\Apps\DeskBox-Agent\mcp\DeskBox.Mcp.exe`
+   - 命令：`DeskBox 安装目录\mcp\DeskBox.Mcp.exe`
    - 参数：留空
-   - 工作目录：`D:\Apps\DeskBox-Agent\mcp`
+   - 工作目录：`DeskBox 安装目录\mcp`
 4. 重新连接 MCP，然后让 AI 调用 `ping` 或 `get_app_status` 检查连接。
 
-请按照你的实际解压位置修改命令和工作目录。MCP 进程由 AI 客户端按需启动，
-DeskBox 主程序需要先运行。
+如果使用 ZIP 便携包，请完整解压，然后将命令和工作目录改为实际解压位置。
+MCP 进程由 AI 客户端按需启动，DeskBox 主程序需要先运行。
+
+## 不需要 MCP 时
+
+只下载并安装名称中带 `App` 的本体安装包即可。纯本体包不包含
+`DeskBox.Mcp.exe`，不会产生 MCP 进程。以后可以随时单独安装或卸载 MCP；卸载 MCP
+不会删除 DeskBox 本体、格子、待办、随记或桌面文件。
 
 ## 换电脑时的数据迁移
 

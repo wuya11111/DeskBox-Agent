@@ -4,11 +4,13 @@ param(
     [string]$Platform = "x64",
 
     [ValidatePattern("^[0-9A-Za-z][0-9A-Za-z.-]*$")]
-    [string]$Version = "1.4.8-agent.1",
+    [string]$Version = "1.4.8-agent.2",
 
     [string]$DotNetPath = "",
 
-    [switch]$ReuseDeskBoxPublish
+    [switch]$ReuseDeskBoxPublish,
+
+    [switch]$SkipInstallers
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,10 +22,14 @@ $artifactRoot = Join-Path $repoRoot ".artifacts\agent-release"
 $runRoot = Join-Path $artifactRoot $runtimeIdentifier
 $mcpBuildRoot = Join-Path $runRoot "mcp-build"
 $mcpPublishDirectory = Join-Path $runRoot "mcp-publish"
-$packageName = "DeskBox-Agent-$Version-$runtimeIdentifier"
-$packageDirectory = Join-Path $runRoot $packageName
-$zipPath = Join-Path $runRoot "$packageName.zip"
-$checksumPath = "$zipPath.sha256"
+$appPackageName = "DeskBox-Agent-$Version-App-$runtimeIdentifier"
+$mcpPackageName = "DeskBox-Agent-$Version-MCP-$runtimeIdentifier"
+$appPackageDirectory = Join-Path $runRoot $appPackageName
+$mcpPackageDirectory = Join-Path $runRoot $mcpPackageName
+$appZipPath = Join-Path $runRoot "$appPackageName.zip"
+$mcpZipPath = Join-Path $runRoot "$mcpPackageName.zip"
+$appInstallerPath = Join-Path $runRoot "$appPackageName.exe"
+$mcpInstallerPath = Join-Path $runRoot "$mcpPackageName.exe"
 $deskBoxPublishDirectory = Join-Path $repoRoot ".artifacts\aot-retail\$runtimeIdentifier\publish"
 $mcpProject = Join-Path $repoRoot "src\DeskBox.Mcp\DeskBox.Mcp.csproj"
 $toolchainScript = Join-Path $PSScriptRoot "rust-arm64-msvc-environment.ps1"
@@ -66,6 +72,48 @@ function Get-PeMachine {
     }
 }
 
+function Get-InnoCompilerPath {
+    $command = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+    if ($null -ne $command) {
+        return $command.Source
+    }
+
+    $candidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"),
+        (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"),
+        (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe")
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            return $candidate
+        }
+    }
+
+    throw "ISCC.exe was not found. Install Inno Setup 6 or use -SkipInstallers."
+}
+
+function New-ChecksumFile {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $hash = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    [System.IO.File]::WriteAllText(
+        "$Path.sha256",
+        "$hash *$([System.IO.Path]::GetFileName($Path))$([Environment]::NewLine)",
+        [System.Text.UTF8Encoding]::new($false))
+    return $hash
+}
+
+function Add-ReleaseDocuments {
+    param(
+        [Parameter(Mandatory)][string]$Destination,
+        [Parameter(Mandatory)][string]$ReadmePath
+    )
+
+    Copy-Item -LiteralPath $ReadmePath -Destination (Join-Path $Destination "README.md")
+    Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination $Destination
+    Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE_CHANGE.md") -Destination $Destination
+}
+
 $dotnet = if ([string]::IsNullOrWhiteSpace($DotNetPath)) {
     (Get-Command dotnet -ErrorAction Stop).Source
 }
@@ -101,8 +149,7 @@ try {
     }
 
     $mcpPublishArguments = @(
-        "publish",
-        $mcpProject,
+        "publish", $mcpProject,
         "--configuration", "Release",
         "--runtime", $runtimeIdentifier,
         "--self-contained", "true",
@@ -143,42 +190,110 @@ if ($LASTEXITCODE -ne 0 -or @($toolsResponse.result.tools).Count -eq 0) {
     throw "DeskBox MCP tools/list smoke test failed."
 }
 
-foreach ($path in @($packageDirectory, $zipPath, $checksumPath)) {
+$generatedPaths = @(
+    $appPackageDirectory, $mcpPackageDirectory,
+    $appZipPath, $mcpZipPath,
+    "$appZipPath.sha256", "$mcpZipPath.sha256",
+    $appInstallerPath, $mcpInstallerPath,
+    "$appInstallerPath.sha256", "$mcpInstallerPath.sha256"
+)
+foreach ($path in $generatedPaths) {
     Assert-PathInsideRoot -Root $artifactRoot -Candidate $path
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Recurse -Force
     }
 }
 
-New-Item -ItemType Directory -Path $packageDirectory -Force | Out-Null
-Copy-Item -Path (Join-Path $deskBoxPublishDirectory "*") -Destination $packageDirectory -Recurse -Force
-$packageMcpDirectory = Join-Path $packageDirectory "mcp"
-New-Item -ItemType Directory -Path $packageMcpDirectory -Force | Out-Null
-Copy-Item -LiteralPath $mcpExecutable -Destination $packageMcpDirectory
-Copy-Item -LiteralPath (Join-Path $repoRoot "docs\agent-release.md") `
-    -Destination (Join-Path $packageDirectory "README.md")
-Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE") -Destination $packageDirectory
-Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE_CHANGE.md") -Destination $packageDirectory
+New-Item -ItemType Directory -Path $appPackageDirectory -Force | Out-Null
+Copy-Item -Path (Join-Path $deskBoxPublishDirectory "*") -Destination $appPackageDirectory -Recurse -Force
+Add-ReleaseDocuments `
+    -Destination $appPackageDirectory `
+    -ReadmePath (Join-Path $repoRoot "docs\agent-app-release.md")
 
-Compress-Archive -LiteralPath $packageDirectory -DestinationPath $zipPath -CompressionLevel Optimal
-$zipHash = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-[System.IO.File]::WriteAllText(
-    $checksumPath,
-    "$zipHash *$([System.IO.Path]::GetFileName($zipPath))$([Environment]::NewLine)",
-    [System.Text.UTF8Encoding]::new($false))
+New-Item -ItemType Directory -Path $mcpPackageDirectory -Force | Out-Null
+Copy-Item -LiteralPath $mcpExecutable -Destination $mcpPackageDirectory
+Add-ReleaseDocuments `
+    -Destination $mcpPackageDirectory `
+    -ReadmePath (Join-Path $repoRoot "docs\agent-release.md")
 
-$packageFiles = @(Get-ChildItem -LiteralPath $packageDirectory -File -Recurse)
+if (Get-ChildItem -LiteralPath $appPackageDirectory -Filter "DeskBox.Mcp.exe" -File -Recurse) {
+    throw "The DeskBox app-only package unexpectedly contains DeskBox.Mcp.exe."
+}
+if (Get-ChildItem -LiteralPath $mcpPackageDirectory -Filter "DeskBox.exe" -File -Recurse) {
+    throw "The MCP-only package unexpectedly contains DeskBox.exe."
+}
+
+Compress-Archive -LiteralPath $appPackageDirectory -DestinationPath $appZipPath -CompressionLevel Optimal
+Compress-Archive -LiteralPath $mcpPackageDirectory -DestinationPath $mcpZipPath -CompressionLevel Optimal
+$appZipHash = New-ChecksumFile -Path $appZipPath
+$mcpZipHash = New-ChecksumFile -Path $mcpZipPath
+
+$appInstallerHash = $null
+$mcpInstallerHash = $null
+if (-not $SkipInstallers) {
+    $innoCompiler = Get-InnoCompilerPath
+    $appInstallerScript = if ($Platform -eq "ARM64") {
+        Join-Path $repoRoot "installer\DeskBox.arm64.iss"
+    }
+    else {
+        Join-Path $repoRoot "installer\DeskBox.iss"
+    }
+    $appInstallerName = [System.IO.Path]::GetFileNameWithoutExtension($appInstallerPath)
+    $appInnoArguments = @(
+        "/Qp",
+        "/DDeskBoxNativeAot=1",
+        "/DDeskBoxBundledRuntime=1",
+        "/DDeskBoxIncludeMcp=0",
+        "/DMyAppReleaseDir=$appPackageDirectory",
+        "/F$appInstallerName",
+        "/O$runRoot",
+        $appInstallerScript
+    )
+    & $innoCompiler @appInnoArguments
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $appInstallerPath -PathType Leaf)) {
+        throw "DeskBox app-only installer compilation failed."
+    }
+
+    if ($Platform -ne "x64") {
+        throw "The standalone MCP installer currently supports x64 only."
+    }
+    $mcpInstallerName = [System.IO.Path]::GetFileNameWithoutExtension($mcpInstallerPath)
+    $mcpInnoArguments = @(
+        "/Qp",
+        "/DMyAppVersion=$Version",
+        "/DMcpReleaseDir=$mcpPackageDirectory",
+        "/F$mcpInstallerName",
+        "/O$runRoot",
+        (Join-Path $repoRoot "installer\DeskBox.Mcp.iss")
+    )
+    & $innoCompiler @mcpInnoArguments
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $mcpInstallerPath -PathType Leaf)) {
+        throw "DeskBox MCP-only installer compilation failed."
+    }
+
+    $appInstallerHash = New-ChecksumFile -Path $appInstallerPath
+    $mcpInstallerHash = New-ChecksumFile -Path $mcpInstallerPath
+}
+
+$appFiles = @(Get-ChildItem -LiteralPath $appPackageDirectory -File -Recurse)
+$mcpFiles = @(Get-ChildItem -LiteralPath $mcpPackageDirectory -File -Recurse)
 [pscustomobject]@{
     Version = $Version
     Platform = $Platform
     RuntimeIdentifier = $runtimeIdentifier
-    PackageDirectory = $packageDirectory
-    PackageFiles = $packageFiles.Count
-    PackageMiB = [Math]::Round(
-        ($packageFiles | Measure-Object -Property Length -Sum).Sum / 1MB,
-        1)
-    ZipPath = $zipPath
-    ZipMiB = [Math]::Round((Get-Item -LiteralPath $zipPath).Length / 1MB, 1)
-    Sha256 = $zipHash
+    AppPackageFiles = $appFiles.Count
+    AppPackageMiB = [Math]::Round(($appFiles | Measure-Object Length -Sum).Sum / 1MB, 1)
+    AppZipPath = $appZipPath
+    AppZipMiB = [Math]::Round((Get-Item -LiteralPath $appZipPath).Length / 1MB, 1)
+    AppZipSha256 = $appZipHash
+    AppInstallerPath = if ($SkipInstallers) { $null } else { $appInstallerPath }
+    AppInstallerSha256 = $appInstallerHash
+    McpPackageFiles = $mcpFiles.Count
+    McpPackageMiB = [Math]::Round(($mcpFiles | Measure-Object Length -Sum).Sum / 1MB, 1)
+    McpZipPath = $mcpZipPath
+    McpZipMiB = [Math]::Round((Get-Item -LiteralPath $mcpZipPath).Length / 1MB, 1)
+    McpZipSha256 = $mcpZipHash
+    McpInstallerPath = if ($SkipInstallers) { $null } else { $mcpInstallerPath }
+    McpInstallerSha256 = $mcpInstallerHash
     McpToolCount = @($toolsResponse.result.tools).Count
 }

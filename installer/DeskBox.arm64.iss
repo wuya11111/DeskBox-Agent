@@ -5,11 +5,17 @@
 ; ISCC /DDeskBoxNativeAot=1 /DDeskBoxBundledRuntime=1 /DMyAppReleaseDir=<publish 目录> DeskBox.arm64.iss
 
 #define MyAppName "DeskBox"
+#ifndef MyAppVersion
 #define MyAppVersion "1.4.8"
+#endif
+#ifndef MyAppVersionInfo
 #define MyAppVersionInfo "1.4.8.0"
+#endif
 #define MyAppPublisher "朱天雨"
 #define MyAppExeName "DeskBox.exe"
+#ifndef MyAppOutputBaseName
 #define MyAppOutputBaseName "DeskBox_Setup"
+#endif
 #define MyAppRuntimeArchitecture "ARM64"
 #ifndef MyAppPackageSuffix
 #define MyAppPackageSuffix ""
@@ -23,6 +29,10 @@
 #ifndef MyAppReleaseDir
 #define MyAppReleaseDir "..\artifacts\publish\DeskBox\arm64"
 #endif
+#ifndef DeskBoxIncludeMcp
+#define DeskBoxIncludeMcp 0
+#endif
+
 
 [Setup]
 AppId={{5E052824-3456-427E-9759-3BCAE078A1D3}
@@ -232,14 +242,22 @@ Type: files; Name: "{autostartup}\{#MyAppName}.lnk"
 Source: "..\scripts\cleanup-deskbox-install.ps1"; Flags: dontcopy
 Source: "DeskBox.LegacyBundledRuntimeFiles.txt"; Flags: dontcopy
 Source: "{#MyAppReleaseDir}\DeskBox.InstallManifest.txt"; DestDir: "{tmp}"; DestName: "DeskBox.InstallManifest.current.txt"; Flags: ignoreversion deleteafterinstall
+#if DeskBoxIncludeMcp
 Source: "{#MyAppReleaseDir}\*"; DestDir: "{app}"; Excludes: "DeskBox.Updater.*,deskbox_native.dll,deskbox_native.pdb,DeskBox.InstallManifest.txt"; Flags: ignoreversion recursesubdirs createallsubdirs
+#else
+Source: "{#MyAppReleaseDir}\*"; DestDir: "{app}"; Excludes: "DeskBox.Updater.*,deskbox_native.dll,deskbox_native.pdb,DeskBox.InstallManifest.txt,mcp\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 #if DeskBoxNativeAot
 Source: "{#MyAppReleaseDir}\deskbox_native.dll"; DestDir: "{app}"; Flags: ignoreversion
 #endif
 Source: "{#MyAppReleaseDir}\DeskBox.Updater.*"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppReleaseDir}\DeskBox.InstallManifest.txt"; DestDir: "{app}"; Flags: ignoreversion; BeforeInstall: CleanupDeskBoxInstall
 #else
+#if DeskBoxIncludeMcp
 Source: "{#MyAppReleaseDir}\*"; DestDir: "{app}"; Excludes: "DeskBox.Updater.*,deskbox_native.dll,deskbox_native.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
+#else
+Source: "{#MyAppReleaseDir}\*"; DestDir: "{app}"; Excludes: "DeskBox.Updater.*,deskbox_native.dll,deskbox_native.pdb,mcp\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+#endif
 #if DeskBoxNativeAot
 Source: "{#MyAppReleaseDir}\deskbox_native.dll"; DestDir: "{app}"; Flags: ignoreversion
 #endif
