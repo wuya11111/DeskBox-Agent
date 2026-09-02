@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 发布版本，例如 1.4.8-agent.2
+        description: 发布版本，例如 1.4.8-agent.3
         required: true
-        default: 1.4.8-agent.2
+        default: 1.4.8-agent.3
   push:
     tags:
       - "v*-agent.*"

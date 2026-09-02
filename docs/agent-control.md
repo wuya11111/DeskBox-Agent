@@ -130,7 +130,7 @@ dotnet run --project .\src\DeskBox.Mcp\DeskBox.Mcp.csproj
 生成 x64 本体、MCP 的独立 EXE/ZIP 和 SHA256 文件：
 
 ```powershell
-.\scripts\publish-agent-release.ps1 -Platform x64 -Version 1.4.8-agent.2
+.\scripts\publish-agent-release.ps1 -Platform x64 -Version 1.4.8-agent.3
 ```
 
 产物位于 `.artifacts\agent-release\win-x64`。发布包不包含用户设置、格子数据、待办、

@@ -43,8 +43,8 @@ DeskBox 使用贴近 Windows 原生体验的材质，同时保留普通桌面文
 
 Agent 版本已经拆分为两个独立安装程序，普通用户直接下载 EXE 即可：
 
-- [DeskBox Agent 本体安装包](https://github.com/wuya11111/DeskBox-Agent/releases/download/v1.4.8-agent.2/DeskBox-Agent-1.4.8-agent.2-App-win-x64.exe)：不包含 MCP，可完全独立使用。
-- [DeskBox MCP 扩展安装包](https://github.com/wuya11111/DeskBox-Agent/releases/download/v1.4.8-agent.2/DeskBox-Agent-1.4.8-agent.2-MCP-win-x64.exe)：只有需要 ChatGPT/AI 控制时才安装，请先安装本体。
+- [DeskBox Agent 本体安装包](https://github.com/wuya11111/DeskBox-Agent/releases/download/v1.4.8-agent.3/DeskBox-Agent-1.4.8-agent.3-App-win-x64.exe)：不包含 MCP，可完全独立使用。
+- [DeskBox MCP 扩展安装包](https://github.com/wuya11111/DeskBox-Agent/releases/download/v1.4.8-agent.3/DeskBox-Agent-1.4.8-agent.3-MCP-win-x64.exe)：只有需要 ChatGPT/AI 控制时才安装，请先安装本体。
 
 只安装本体不会产生 MCP 进程。MCP 可以以后单独安装或卸载，不会删除本体、格子、待办和随记。安装和配置说明见 [Agent/MCP 中文说明](docs/agent-control.md)。
 

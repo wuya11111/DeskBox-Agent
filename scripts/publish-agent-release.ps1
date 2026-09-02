@@ -4,7 +4,7 @@ param(
     [string]$Platform = "x64",
 
     [ValidatePattern("^[0-9A-Za-z][0-9A-Za-z.-]*$")]
-    [string]$Version = "1.4.8-agent.2",
+    [string]$Version = "1.4.8-agent.3",
 
     [string]$DotNetPath = "",
 
