@@ -2417,6 +2417,7 @@
     ,"Glance.CalendarMaterial.Description": "Wählen Sie, wie sich die Kalenderkarte in den Desktop einfügt"
     ,"Glance.CalendarMaterial.FollowSystem": "Systemeinstellung übernehmen"
     ,"Glance.CalendarMaterial.FollowImage": "Bildfarben übernehmen"
+    ,"Glance.CalendarMaterial.Transparent": "Vollständig transparent"
     ,"Glance.CalendarMaterial.Transparency": "Transparenz"
     ,"Glance.CalendarMaterial.TransparencyDescription": "Wirkt nur auf den Kalenderhintergrund; 100 % ist vollständig transparent"
     ,"Glance.TraditionalCalendar.Title": "Traditioneller Kalender"

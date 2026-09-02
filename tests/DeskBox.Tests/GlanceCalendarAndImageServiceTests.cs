@@ -107,6 +107,8 @@ public sealed class GlanceCalendarAndImageServiceTests : IDisposable
         Assert.Contains("BuildEmbeddedMicaTintOverlayColor", codeBehind, StringComparison.Ordinal);
         Assert.Contains("BuildEmbeddedMicaTintOverlayColor", visualCalculator, StringComparison.Ordinal);
         Assert.Contains("CalendarMaterialSurface.Background = _calendarSolidMaterialBrush", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("GlanceCalendarMaterialMode.Transparent", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("CalendarMaterialSurface.Background = null", codeBehind, StringComparison.Ordinal);
         Assert.DoesNotContain("SystemBackdrop =", codeBehind, StringComparison.Ordinal);
         Assert.Contains("BuildContentSolidSurfaceColor", codeBehind, StringComparison.Ordinal);
         Assert.Contains("CalendarMaterialOpacity", viewModel, StringComparison.Ordinal);
@@ -155,6 +157,7 @@ public sealed class GlanceCalendarAndImageServiceTests : IDisposable
         Assert.True(traditionalNoneOption >= 0 && traditionalNoneOption < traditionalAutoOption);
         Assert.DoesNotContain("SliderSettingValueTextStyle", settingsXaml, StringComparison.Ordinal);
         Assert.Contains("Glance.CalendarMaterial.FollowImage", settingsCodeBehind, StringComparison.Ordinal);
+        Assert.Contains("Glance.CalendarMaterial.Transparent", settingsCodeBehind, StringComparison.Ordinal);
         int layoutOption = settingsXaml.IndexOf("x:Name=\"LayoutComboBox\"", StringComparison.Ordinal);
         int calendarMaterialOption = settingsXaml.IndexOf("x:Name=\"CalendarMaterialCard\"", StringComparison.Ordinal);
         int traditionalCalendarOption = settingsXaml.IndexOf("x:Name=\"TraditionalCalendarCard\"", StringComparison.Ordinal);

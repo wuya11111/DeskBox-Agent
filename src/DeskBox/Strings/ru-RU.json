@@ -2417,6 +2417,7 @@
     ,"Glance.CalendarMaterial.Description": "Выберите оформление карточки календаря"
     ,"Glance.CalendarMaterial.FollowSystem": "Как в системе"
     ,"Glance.CalendarMaterial.FollowImage": "По цветам изображения"
+    ,"Glance.CalendarMaterial.Transparent": "Полностью прозрачный"
     ,"Glance.CalendarMaterial.Transparency": "Прозрачность"
     ,"Glance.CalendarMaterial.TransparencyDescription": "Влияет только на фон календаря; 100 % — полностью прозрачный"
     ,"Glance.TraditionalCalendar.Title": "Традиционный календарь"

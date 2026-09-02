@@ -2417,6 +2417,7 @@
     ,"Glance.CalendarMaterial.Description": "Escolha como o cartão do calendário se integra à área de trabalho"
     ,"Glance.CalendarMaterial.FollowSystem": "Seguir o sistema"
     ,"Glance.CalendarMaterial.FollowImage": "Seguir as cores da imagem"
+    ,"Glance.CalendarMaterial.Transparent": "Totalmente transparente"
     ,"Glance.CalendarMaterial.Transparency": "Transparência"
     ,"Glance.CalendarMaterial.TransparencyDescription": "Afeta apenas o fundo do calendário; 100% fica totalmente transparente"
     ,"Glance.TraditionalCalendar.Title": "Calendário tradicional"

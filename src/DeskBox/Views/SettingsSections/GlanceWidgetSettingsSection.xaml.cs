@@ -288,7 +288,8 @@ public sealed partial class GlanceWidgetSettingsSection : UserControl
         SetOptions(
             CalendarMaterialComboBox,
             (Localization.T("Glance.CalendarMaterial.FollowSystem"), GlanceCalendarMaterialMode.FollowSystem),
-            (Localization.T("Glance.CalendarMaterial.FollowImage"), GlanceCalendarMaterialMode.FollowImage));
+            (Localization.T("Glance.CalendarMaterial.FollowImage"), GlanceCalendarMaterialMode.FollowImage),
+            (Localization.T("Glance.CalendarMaterial.Transparent"), GlanceCalendarMaterialMode.Transparent));
         GlanceTraditionalCalendarMode resolvedTraditionalCalendar =
             _traditionalCalendarService.ResolveMode(
                 GlanceTraditionalCalendarMode.Auto,

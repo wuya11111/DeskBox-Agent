@@ -2417,6 +2417,7 @@
     ,"Glance.CalendarMaterial.Description": "カレンダーカードの背景スタイルを選択します"
     ,"Glance.CalendarMaterial.FollowSystem": "システムに従う"
     ,"Glance.CalendarMaterial.FollowImage": "画像の色に従う"
+    ,"Glance.CalendarMaterial.Transparent": "完全に透明"
     ,"Glance.CalendarMaterial.Transparency": "透明度"
     ,"Glance.CalendarMaterial.TransparencyDescription": "カレンダー背景のみに適用され、100% で完全に透明になります"
     ,"Glance.TraditionalCalendar.Title": "伝統暦"

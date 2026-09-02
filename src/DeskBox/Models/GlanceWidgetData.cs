@@ -70,7 +70,8 @@ public enum GlanceReadabilityMode
 public enum GlanceCalendarMaterialMode
 {
     FollowSystem,
-    FollowImage
+    FollowImage,
+    Transparent
 }
 
 public enum GlanceTraditionalCalendarMode

@@ -229,6 +229,13 @@ public sealed partial class GlanceWidgetContent : UserControl
             ?? AccentColorHelper.DefaultAccentColor;
         string materialType = _viewModel.CalendarMaterialType;
 
+        if (_viewModel.CalendarMaterialMode == GlanceCalendarMaterialMode.Transparent)
+        {
+            CalendarMaterialSurface.Background = null;
+            CalendarMaterialSurface.Opacity = 0;
+            return;
+        }
+
         if (_viewModel.CalendarMaterialMode == GlanceCalendarMaterialMode.FollowImage)
         {
             var fallbackTint = WidgetMaterialVisualCalculator.BuildContentTintColor(isDark, accentColor);

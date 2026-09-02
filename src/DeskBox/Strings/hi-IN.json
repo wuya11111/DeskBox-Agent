@@ -2417,6 +2417,7 @@
     ,"Glance.CalendarMaterial.Description": "चुनें कि कैलेंडर कार्ड डेस्कटॉप के साथ कैसे घुले"
     ,"Glance.CalendarMaterial.FollowSystem": "सिस्टम का अनुसरण"
     ,"Glance.CalendarMaterial.FollowImage": "चित्र के रंगों का अनुसरण"
+    ,"Glance.CalendarMaterial.Transparent": "पूरी तरह पारदर्शी"
     ,"Glance.CalendarMaterial.Transparency": "पारदर्शिता"
     ,"Glance.CalendarMaterial.TransparencyDescription": "केवल कैलेंडर पृष्ठभूमि पर लागू; 100% पूरी तरह पारदर्शी है"
     ,"Glance.TraditionalCalendar.Title": "पारंपरिक कैलेंडर"

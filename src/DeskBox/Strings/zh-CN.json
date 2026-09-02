@@ -2417,6 +2417,7 @@
     ,"Glance.CalendarMaterial.Description": "设置日历卡片的背景风格"
     ,"Glance.CalendarMaterial.FollowSystem": "跟随系统"
     ,"Glance.CalendarMaterial.FollowImage": "跟随图片颜色"
+    ,"Glance.CalendarMaterial.Transparent": "完全透明"
     ,"Glance.CalendarMaterial.Transparency": "透明度"
     ,"Glance.CalendarMaterial.TransparencyDescription": "仅调整日历背景，100% 时完全透明"
     ,"Glance.TraditionalCalendar.Title": "传统历法"

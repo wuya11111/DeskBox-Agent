@@ -2417,6 +2417,7 @@
     ,"Glance.CalendarMaterial.Description": "اختر كيفية اندماج بطاقة التقويم مع سطح المكتب"
     ,"Glance.CalendarMaterial.FollowSystem": "اتباع النظام"
     ,"Glance.CalendarMaterial.FollowImage": "اتباع ألوان الصورة"
+    ,"Glance.CalendarMaterial.Transparent": "شفاف بالكامل"
     ,"Glance.CalendarMaterial.Transparency": "الشفافية"
     ,"Glance.CalendarMaterial.TransparencyDescription": "تؤثر في خلفية التقويم فقط؛ 100% تعني شفافية كاملة"
     ,"Glance.TraditionalCalendar.Title": "التقويم التقليدي"

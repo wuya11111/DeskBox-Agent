@@ -145,6 +145,20 @@ public sealed class GlanceWidgetStoreTests : IDisposable
         Assert.False(reloaded.ShowChineseFestivals);
     }
 
+    [Fact]
+    public async Task SaveAsync_PreservesTransparentCalendarMaterialMode()
+    {
+        var store = new GlanceWidgetStore(_tempRoot);
+        await store.SaveAsync(new GlanceWidgetData
+        {
+            CalendarMaterialMode = GlanceCalendarMaterialMode.Transparent
+        });
+
+        GlanceWidgetData reloaded = await new GlanceWidgetStore(_tempRoot).LoadAsync();
+
+        Assert.Equal(GlanceCalendarMaterialMode.Transparent, reloaded.CalendarMaterialMode);
+    }
+
     [Theory]
     [InlineData(-2, 0)]
     [InlineData(0, 0)]
